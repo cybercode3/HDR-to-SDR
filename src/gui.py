@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from tkinter import ttk
@@ -369,12 +370,40 @@ class HDRConverterGUI:
             self.input_folder_var.set(folder_path)
             if not self.output_folder_var.get():
                 self.output_folder_var.set(folder_path)
+            self.prepare_folder_preview(folder_path)
 
     def select_output_folder(self):
         """Open a folder dialog for selecting the batch output directory."""
         folder_path = filedialog.askdirectory()
         if folder_path:
             self.output_folder_var.set(folder_path)
+
+    def prepare_folder_preview(self, folder_path):
+        """Show previews and action buttons when a batch folder is selected."""
+        video_extensions = ('.mp4', '.mkv', '.mov', '.avi', '.webm', '.m4v')
+        self.image_frame.grid()
+        self.action_frame.grid()
+
+        first_video = next(
+            (p for p in sorted(Path(folder_path).iterdir()) if p.suffix.lower() in video_extensions),
+            None
+        )
+
+        if first_video:
+            self.input_path_var.set(str(first_video))
+            base, ext = os.path.splitext(first_video)
+            self.output_path_var.set(f"{base}_sdr{ext}")
+            self.original_image = None
+            self.converted_image_base = None
+            self.error_label.config(text="")
+            self.button_frame.grid()
+            self.update_frame_preview()
+            self.highlight_frame_button(1)
+        else:
+            self.clear_preview()
+            self.error_label.config(text="No supported video files found for preview in this folder.")
+            self.button_frame.grid_remove()
+            self.arrange_widgets(image_frame=False)
 
     def adjust_gamma(self, image, gamma):
         """Adjust gamma of a PIL.Image."""
