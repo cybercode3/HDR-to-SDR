@@ -158,7 +158,8 @@ class ConversionManager:
                                selected_filter_index, progress_var,
                                interactable_elements, gui_instance,
                                open_after_conversion, cancel_button,
-                               tonemapper='reinhard'):
+                               tonemapper='reinhard', batch_position_var=None,
+                               current_file_var=None):
         input_dir = Path(input_dir).expanduser().resolve()
         output_dir = Path(output_dir).expanduser().resolve()
 
@@ -190,7 +191,8 @@ class ConversionManager:
             target=self._run_batch_conversion,
             args=(files, output_dir, gamma, use_gpu, selected_filter_index,
                   progress_var, gui_instance, interactable_elements,
-                  cancel_button, open_after_conversion, tonemapper)
+                  cancel_button, open_after_conversion, tonemapper,
+                  batch_position_var, current_file_var)
         )
         thread.daemon = True
         thread.start()
@@ -198,7 +200,8 @@ class ConversionManager:
     def _run_batch_conversion(self, files, output_dir, gamma, use_gpu,
                                selected_filter_index, progress_var, gui_instance,
                                interactable_elements, cancel_button,
-                               open_after_conversion, tonemapper):
+                               open_after_conversion, tonemapper,
+                               batch_position_var, current_file_var):
         total_files = len(files)
         successes = 0
         failures = []
@@ -206,6 +209,15 @@ class ConversionManager:
         for index, file_path in enumerate(files):
             if self.cancelled:
                 break
+
+            if batch_position_var is not None:
+                gui_instance.root.after(
+                    0, lambda i=index: batch_position_var.set(f"[{i + 1}/{total_files}]")
+                )
+            if current_file_var is not None:
+                gui_instance.root.after(
+                    0, lambda name=file_path.name: current_file_var.set(f"Current file: {name}")
+                )
 
             output_path = output_dir / f"{file_path.stem}_sdr{file_path.suffix}"
             success = self._convert_single_file(
@@ -226,14 +238,22 @@ class ConversionManager:
         def _handle_batch_completion():
             if self.cancelled:
                 messagebox.showinfo("Cancelled", "Batch conversion was cancelled.")
+                if current_file_var is not None:
+                    current_file_var.set("Batch cancelled.")
             else:
                 summary = f"Converted {successes}/{total_files} files."
                 if failures:
                     summary += "\nFailed files:\n" + "\n".join(failures)
                 messagebox.showinfo("Batch Conversion Complete", summary)
 
+                if current_file_var is not None:
+                    current_file_var.set("Batch conversion complete.")
+
                 if open_after_conversion:
                     webbrowser.open(str(output_dir))
+
+            if batch_position_var is not None:
+                batch_position_var.set("")
 
             self.enable_ui(interactable_elements)
             cancel_button.grid_remove()

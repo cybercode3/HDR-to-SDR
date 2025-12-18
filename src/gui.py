@@ -32,6 +32,8 @@ class HDRConverterGUI:
         self.output_folder_var = tk.StringVar()
         self.gamma_var = tk.DoubleVar(value=1.0)
         self.progress_var = tk.DoubleVar(value=0)
+        self.current_file_var = tk.StringVar(value="")
+        self.batch_position_var = tk.StringVar(value="")
         self.open_after_conversion_var = tk.BooleanVar()
         self.display_image_var = tk.BooleanVar(value=True)
         self.original_image = None  # Cache for the original frame
@@ -303,6 +305,13 @@ class HDRConverterGUI:
         self.progress_bar = ttk.Progressbar(self.image_frame, variable=self.progress_var, maximum=100)
         self.progress_bar.grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E))
 
+        # Batch conversion indicators
+        self.batch_position_label = ttk.Label(self.image_frame, textvariable=self.batch_position_var)
+        self.batch_position_label.grid(row=4, column=0, sticky=tk.W, padx=(10, 0))
+
+        self.current_file_label = ttk.Label(self.image_frame, textvariable=self.current_file_var)
+        self.current_file_label.grid(row=4, column=1, columnspan=2, sticky=tk.W)
+
         # List of interactable elements
         self.interactable_elements = [
             self.browse_button, self.convert_button, self.batch_convert_button, self.gamma_slider,
@@ -329,6 +338,7 @@ class HDRConverterGUI:
         self.image_frame.rowconfigure(1, weight=1)
         self.image_frame.rowconfigure(2, weight=0)
         self.image_frame.rowconfigure(3, weight=0)
+        self.image_frame.rowconfigure(4, weight=0)
 
         # Root Grid Configuration
         self.root.grid_rowconfigure(0, weight=0)
@@ -623,11 +633,16 @@ class HDRConverterGUI:
                 f"Starting batch conversion - Input folder: {input_dir}, Output folder: {output_dir}, Gamma: {gamma}"
             )
 
+            self.batch_position_var.set("")
+            self.current_file_var.set("")
+
             conversion_manager.start_batch_conversion(
                 input_dir, output_dir, gamma, use_gpu, selected_filter_index,
                 self.progress_var, self.interactable_elements, self,
                 self.open_after_conversion_var.get(), self.cancel_button,
-                tonemapper=tonemapper
+                tonemapper=tonemapper,
+                batch_position_var=self.batch_position_var,
+                current_file_var=self.current_file_var
             )
         except Exception as e:
             logging.error(f"Batch conversion error: {str(e)}", exc_info=True)
