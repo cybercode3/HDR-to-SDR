@@ -11,6 +11,7 @@ This is a simple GUI application to convert HDR videos to SDR using FFmpeg. The 
 - **GPU Acceleration**: Utilize NVIDIA GPUs for faster conversion using CUDA if available.
 - **Conversion Methods**: Choose between a static or dynamic conversion method. Static uses the same conversion no matter the file, dynamic takes the brightness of the original into account.
 - **Tonemappers**: Choose between 3 different tonemappers Reinhard, Mobius, and Hable.
+- **Batch Conversions**: Select a folder to convert all supported videos at once, automatically writing SDR outputs to an output folder.
 
 ## Requirements
 

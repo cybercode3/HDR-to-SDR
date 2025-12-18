@@ -5,6 +5,7 @@ import webbrowser
 import multiprocessing
 import re
 import logging
+from pathlib import Path
 from tkinter import messagebox
 from utils import get_video_properties, FFMPEG_FILTER, FFMPEG_EXECUTABLE, FFPROBE_EXECUTABLE, get_maxfall
 from tkinterdnd2 import DND_FILES
@@ -153,6 +154,144 @@ class ConversionManager:
         logging.debug(f"Constructed ffmpeg command: {' '.join(cmd)}")
         return cmd
 
+    def start_batch_conversion(self, input_dir, output_dir, gamma, use_gpu,
+                               selected_filter_index, progress_var,
+                               interactable_elements, gui_instance,
+                               open_after_conversion, cancel_button,
+                               tonemapper='reinhard'):
+        input_dir = Path(input_dir).expanduser().resolve()
+        output_dir = Path(output_dir).expanduser().resolve()
+
+        if not input_dir.exists() or not input_dir.is_dir():
+            messagebox.showerror("Error", f"Input folder not found: {input_dir}")
+            return
+
+        try:
+            output_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            messagebox.showerror("Error", f"Could not create output folder: {e}")
+            return
+
+        video_extensions = ('.mp4', '.mkv', '.mov', '.avi', '.webm', '.m4v')
+        files = [p for p in sorted(input_dir.iterdir()) if p.suffix.lower() in video_extensions]
+
+        if not files:
+            messagebox.showwarning("Warning", "No supported video files found in the selected folder.")
+            return
+
+        self.cancelled = False
+        self.use_gpu = use_gpu
+        self.disable_ui(interactable_elements)
+        progress_var.set(0)
+        cancel_button.config(command=lambda: self.cancel_batch(gui_instance, interactable_elements, cancel_button))
+        cancel_button.grid()
+
+        thread = threading.Thread(
+            target=self._run_batch_conversion,
+            args=(files, output_dir, gamma, use_gpu, selected_filter_index,
+                  progress_var, gui_instance, interactable_elements,
+                  cancel_button, open_after_conversion, tonemapper)
+        )
+        thread.daemon = True
+        thread.start()
+
+    def _run_batch_conversion(self, files, output_dir, gamma, use_gpu,
+                               selected_filter_index, progress_var, gui_instance,
+                               interactable_elements, cancel_button,
+                               open_after_conversion, tonemapper):
+        total_files = len(files)
+        successes = 0
+        failures = []
+
+        for index, file_path in enumerate(files):
+            if self.cancelled:
+                break
+
+            output_path = output_dir / f"{file_path.stem}_sdr{file_path.suffix}"
+            success = self._convert_single_file(
+                file_path, output_path, gamma, use_gpu, selected_filter_index,
+                progress_var, gui_instance, index, total_files, tonemapper
+            )
+            if success:
+                successes += 1
+            else:
+                failures.append(file_path.name)
+
+            current_progress = ((index + 1) / total_files) * 100
+            gui_instance.root.after(0, lambda p=current_progress: progress_var.set(p))
+
+        final_progress = 100 if not self.cancelled else progress_var.get()
+        gui_instance.root.after(0, lambda: progress_var.set(final_progress))
+
+        def _handle_batch_completion():
+            if self.cancelled:
+                messagebox.showinfo("Cancelled", "Batch conversion was cancelled.")
+            else:
+                summary = f"Converted {successes}/{total_files} files."
+                if failures:
+                    summary += "\nFailed files:\n" + "\n".join(failures)
+                messagebox.showinfo("Batch Conversion Complete", summary)
+
+                if open_after_conversion:
+                    webbrowser.open(str(output_dir))
+
+            self.enable_ui(interactable_elements)
+            cancel_button.grid_remove()
+
+            if hasattr(gui_instance, 'register_drop_target'):
+                gui_instance.register_drop_target()
+
+        gui_instance.root.after(0, _handle_batch_completion)
+
+    def _convert_single_file(self, input_path, output_path, gamma, use_gpu,
+                             selected_filter_index, progress_var, gui_instance,
+                             file_index, total_files, tonemapper):
+        properties = get_video_properties(str(input_path))
+        if properties is None:
+            messagebox.showwarning("Warning", f"Failed to retrieve video properties for {input_path.name}.")
+            return False
+
+        cmd = self.construct_ffmpeg_command(
+            str(input_path), str(output_path), gamma, properties, use_gpu, selected_filter_index,
+            tonemapper=tonemapper
+        )
+        self.process = self.start_ffmpeg_process(cmd)
+
+        progress_pattern = re.compile(r'time=(\d+:\d+:\d+\.\d+)')
+        error_messages = []
+
+        for line in self.process.stderr:
+            if self.process is None:
+                return False
+            decoded_line = line.strip()
+            logging.debug(decoded_line)
+            error_messages.append(decoded_line)
+            match = progress_pattern.search(decoded_line)
+            if match:
+                elapsed_time = self.parse_time(match.group(1))
+                progress = ((file_index + (elapsed_time / properties['duration'])) / total_files) * 100
+                gui_instance.root.after(0, lambda p=progress: progress_var.set(p))
+                gui_instance.root.after(0, gui_instance.root.update_idletasks)
+
+            if self.cancelled:
+                self.process.terminate()
+                return False
+
+        if self.process is not None:
+            self.process.wait()
+
+        if self.cancelled:
+            return False
+
+        if self.process is None or self.process.returncode != 0:
+            logging.error(
+                f"Conversion failed for {input_path.name} with code {self.process.returncode if self.process else 'N/A'}: "
+                f"{' '.join(error_messages)}"
+            )
+            return False
+
+        return True
+
     def start_ffmpeg_process(self, cmd):
         """Start the FFmpeg process without showing a console window."""
         startupinfo = None
@@ -261,6 +400,18 @@ class ConversionManager:
 
             if hasattr(gui_instance, 'register_drop_target'):
                 gui_instance.register_drop_target()
+
+    def cancel_batch(self, gui_instance, interactable_elements, cancel_button):
+        """Cancel the ongoing batch conversion without duplicate dialogs."""
+        self.cancelled = True
+        if self.process:
+            self.process.terminate()
+            self.process = None
+        self.enable_ui(interactable_elements)
+        cancel_button.grid_remove()
+
+        if hasattr(gui_instance, 'register_drop_target'):
+            gui_instance.register_drop_target()
 
     def extract_frame(self, video_path, time=None):
         properties = get_video_properties(video_path)

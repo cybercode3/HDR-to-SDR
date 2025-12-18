@@ -27,6 +27,8 @@ class HDRConverterGUI:
         # Variables
         self.input_path_var = tk.StringVar()
         self.output_path_var = tk.StringVar()
+        self.input_folder_var = tk.StringVar()
+        self.output_folder_var = tk.StringVar()
         self.gamma_var = tk.DoubleVar(value=1.0)
         self.progress_var = tk.DoubleVar(value=0)
         self.open_after_conversion_var = tk.BooleanVar()
@@ -84,13 +86,35 @@ class HDRConverterGUI:
         )
         self.browse_button.grid(row=0, column=2, sticky=tk.W, padx=(5, 0))
 
+        # Input Folder Widgets
+        ttk.Label(self.control_frame, text="Input Folder:").grid(row=1, column=0, sticky=tk.W)
+        self.input_folder_entry = ttk.Entry(self.control_frame, textvariable=self.input_folder_var, width=40)
+        self.input_folder_entry.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=(10, 10))
+        self.input_folder_button = ttk.Button(
+            self.control_frame,
+            text="Browse",
+            command=self.select_input_folder
+        )
+        self.input_folder_button.grid(row=1, column=2, sticky=tk.W, padx=(5, 0))
+
         # Output File Widgets
-        ttk.Label(self.control_frame, text="Output File:").grid(row=1, column=0, sticky=tk.W)
+        ttk.Label(self.control_frame, text="Output File:").grid(row=2, column=0, sticky=tk.W)
         self.output_entry = ttk.Entry(self.control_frame, textvariable=self.output_path_var, width=40)
-        self.output_entry.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=(10, 10))
+        self.output_entry.grid(row=2, column=1, sticky=(tk.W, tk.E), padx=(10, 10))
+
+        # Output Folder Widgets
+        ttk.Label(self.control_frame, text="Output Folder:").grid(row=3, column=0, sticky=tk.W)
+        self.output_folder_entry = ttk.Entry(self.control_frame, textvariable=self.output_folder_var, width=40)
+        self.output_folder_entry.grid(row=3, column=1, sticky=(tk.W, tk.E), padx=(10, 10))
+        self.output_folder_button = ttk.Button(
+            self.control_frame,
+            text="Browse",
+            command=self.select_output_folder
+        )
+        self.output_folder_button.grid(row=3, column=2, sticky=tk.W, padx=(5, 0))
 
         # Gamma Adjustment Widgets
-        ttk.Label(self.control_frame, text="Gamma:").grid(row=2, column=0, sticky=tk.W)
+        ttk.Label(self.control_frame, text="Gamma:").grid(row=4, column=0, sticky=tk.W)
         self.gamma_slider = ttk.Scale(
             self.control_frame,
             variable=self.gamma_var,
@@ -100,9 +124,9 @@ class HDRConverterGUI:
             length=200,
             command=self.update_frame_preview
         )
-        self.gamma_slider.grid(row=2, column=1, sticky=(tk.W, tk.E), padx=(10, 10))
+        self.gamma_slider.grid(row=4, column=1, sticky=(tk.W, tk.E), padx=(10, 10))
         self.gamma_entry = ttk.Entry(self.control_frame, textvariable=self.gamma_var, width=5)
-        self.gamma_entry.grid(row=2, column=2, sticky=tk.W, padx=(5, 0))
+        self.gamma_entry.grid(row=4, column=2, sticky=tk.W, padx=(5, 0))
         self.gamma_entry.bind('<Return>', self.update_frame_preview)
 
         # GPU Acceleration Checkbox
@@ -112,11 +136,11 @@ class HDRConverterGUI:
             variable=self.gpu_accel_var,
             command=self.check_gpu_acceleration
         )
-        self.gpu_accel_checkbutton.grid(row=3, column=0, sticky=tk.W, pady=(5, 0))
+        self.gpu_accel_checkbutton.grid(row=5, column=0, sticky=tk.W, pady=(5, 0))
 
         # Add Filter Combobox with padding and event binding
         filter_frame = ttk.Frame(self.control_frame)
-        filter_frame.grid(row=3, column=1, sticky=tk.W, padx=(5, 10), pady=(5, 0))
+        filter_frame.grid(row=5, column=1, sticky=tk.W, padx=(5, 10), pady=(5, 0))
         
         self.filter_combobox = ttk.Combobox(
             filter_frame,
@@ -146,7 +170,7 @@ class HDRConverterGUI:
 
         # Move tonemapper to a new frame next to display image checkbox
         display_frame = ttk.Frame(self.control_frame)
-        display_frame.grid(row=4, column=0, columnspan=3, sticky=tk.W, pady=(5, 0))
+        display_frame.grid(row=6, column=0, columnspan=3, sticky=tk.W, pady=(5, 0))
 
         # Display Image Checkbox in the new frame
         self.display_image_checkbutton = ttk.Checkbutton(
@@ -229,7 +253,7 @@ class HDRConverterGUI:
 
         # Error Label
         self.error_label = ttk.Label(self.control_frame, text='', foreground='red')
-        self.error_label.grid(row=4, column=0, columnspan=3, sticky=tk.W)
+        self.error_label.grid(row=7, column=0, columnspan=3, sticky=tk.W)
 
         # Button Frame
         self.button_frame = ttk.Frame(self.image_frame)
@@ -257,13 +281,21 @@ class HDRConverterGUI:
         )
         self.convert_button.grid(row=1, column=1, padx=(5, 5), pady=(0, 10), sticky=tk.N)
 
+        # Batch Convert Button
+        self.batch_convert_button = ttk.Button(
+            self.action_frame,
+            text="Batch Convert Folder",
+            command=self.convert_folder
+        )
+        self.batch_convert_button.grid(row=1, column=2, padx=(5, 5), pady=(0, 10), sticky=tk.N)
+
         # Cancel Button
         self.cancel_button = ttk.Button(
             self.action_frame,
             text="Cancel",
             command=self.cancel_conversion
         )
-        self.cancel_button.grid(row=1, column=2, padx=(5, 5), pady=(0, 10), sticky=tk.N)
+        self.cancel_button.grid(row=1, column=3, padx=(5, 5), pady=(0, 10), sticky=tk.N)
         self.cancel_button.grid_remove()
 
         # Progress Bar
@@ -272,9 +304,11 @@ class HDRConverterGUI:
 
         # List of interactable elements
         self.interactable_elements = [
-            self.browse_button, self.convert_button, self.gamma_slider,
+            self.browse_button, self.convert_button, self.batch_convert_button, self.gamma_slider,
             self.open_after_conversion_checkbutton, self.display_image_checkbutton,
-            self.input_entry, self.output_entry, self.gamma_entry, self.gpu_accel_checkbutton
+            self.input_entry, self.output_entry, self.gamma_entry, self.gpu_accel_checkbutton,
+            self.input_folder_button, self.output_folder_button, self.input_folder_entry,
+            self.output_folder_entry
         ]
 
     def configure_grid(self):
@@ -283,7 +317,7 @@ class HDRConverterGUI:
         self.control_frame.columnconfigure(0, weight=0)
         self.control_frame.columnconfigure(1, weight=1)
         self.control_frame.columnconfigure(2, weight=0)
-        for i in range(5):
+        for i in range(8):
             self.control_frame.rowconfigure(i, weight=0)
 
         # Image Frame Grid Configuration
@@ -327,6 +361,20 @@ class HDRConverterGUI:
             self.action_frame.grid()
             self.update_frame_preview()
             self.highlight_frame_button(1)  # Highlight button 1 when image is loaded
+
+    def select_input_folder(self):
+        """Open a folder dialog for selecting the batch input directory."""
+        folder_path = filedialog.askdirectory()
+        if folder_path:
+            self.input_folder_var.set(folder_path)
+            if not self.output_folder_var.get():
+                self.output_folder_var.set(folder_path)
+
+    def select_output_folder(self):
+        """Open a folder dialog for selecting the batch output directory."""
+        folder_path = filedialog.askdirectory()
+        if folder_path:
+            self.output_folder_var.set(folder_path)
 
     def adjust_gamma(self, image, gamma):
         """Adjust gamma of a PIL.Image."""
@@ -519,6 +567,42 @@ class HDRConverterGUI:
         except Exception as e:
             logging.error(f"Conversion error: {str(e)}", exc_info=True)
             messagebox.showerror("Conversion Error", f"An error occurred during conversion: {e}")
+
+    def convert_folder(self):
+        """Convert all supported videos in the selected folder."""
+        try:
+            input_dir = os.path.normpath(self.input_folder_var.get())
+            output_dir = os.path.normpath(self.output_folder_var.get() or input_dir)
+            gamma = self.gamma_var.get()
+            use_gpu = self.gpu_accel_var.get()
+            selected_filter_index = self.filter_options.index(self.filter_var.get())
+            tonemapper = self.tonemap_var.get().lower()
+
+            if not input_dir or not output_dir:
+                messagebox.showwarning("Warning", "Please select both an input folder and an output folder.")
+                return
+
+            if not os.path.isdir(input_dir):
+                messagebox.showerror("Error", f"Input folder not found: {input_dir}")
+                return
+
+            if self.drop_target_registered:
+                self.unregister_drop_target()
+
+            self.cancel_button.grid()
+            logging.info(
+                f"Starting batch conversion - Input folder: {input_dir}, Output folder: {output_dir}, Gamma: {gamma}"
+            )
+
+            conversion_manager.start_batch_conversion(
+                input_dir, output_dir, gamma, use_gpu, selected_filter_index,
+                self.progress_var, self.interactable_elements, self,
+                self.open_after_conversion_var.get(), self.cancel_button,
+                tonemapper=tonemapper
+            )
+        except Exception as e:
+            logging.error(f"Batch conversion error: {str(e)}", exc_info=True)
+            messagebox.showerror("Batch Conversion Error", f"An error occurred during batch conversion: {e}")
 
     def cancel_conversion(self):
         """Cancel the ongoing video conversion process."""
